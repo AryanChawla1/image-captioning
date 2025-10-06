@@ -1,0 +1,12 @@
+# Virtual environment directory
+venv_ic/
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+
+# Input Data 
+data/
+
+# Output Embeddings and Metadata (only if it gets too big)
+# embeddings/
