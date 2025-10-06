@@ -1,4 +1,4 @@
-# Image Captioning Project: Flickr8k Data Preparation
+# Image Captioning Project: Flickr8k Data
 
 This project uses the Flickr8k dataset and the Hugging Face `datasets` library to prepare data for training an image captioning model.
 
@@ -17,6 +17,8 @@ You must first create and activate the environment to isolate project dependenci
 | **Mac/Linux** | `python3 -m venv venv_ic` | `source venv_ic/bin/activate` |
 | **Windows (CMD)** | `python -m venv venv_ic` | `venv_ic\Scripts\activate.bat` |
 | **Windows (PowerShell)** | `python -m venv venv_ic` | `.\venv_ic\Scripts\Activate.ps1` |
+
+To deactivate the environment when finished: `deactivate`
 
 ### 2. Install Dependencies
 
@@ -44,4 +46,25 @@ This command will:
 
 4. Save the three finalized, flattened dataset files as `flickr8k_train.parquet`, `flickr8k_validation.parquet`, and `flickr8k_test.parquet` inside the `processed_data/` directory.
 
-To deactivate the environment when finished: `deactivate`
+### 4. Generate embeddings
+
+After the Parquet files are created, run `generate_embeddings.py` file to create embeddings. 
+
+It should result in three new files: `flickr8k_train_embedded.parquet`, `flickr8k_validation_embedded.parquet`, and `flickr8k_test_embedded.parquet`.
+
+These files contain 4 columns: original image, original caption, image embeddings, caption embeddings.
+
+These embeddings WILL be added in the .gitignore files.
+
+## Tuning and stuff
+
+## Extras
+
+### check_scripts folder
+
+This folder contains short python scripts to check if things are working.
+
+`check_pytorch.py` checks if you can use GPU training over CPU
+
+`check_embeddings.py` prints the first few rows of embeddings from the generated Parquet files
+
