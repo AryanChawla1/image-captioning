@@ -1,18 +1,16 @@
-# generate_captions.py
+# Colab cell: generate captions (inference-safe)
 import torch
-from transformers import AutoTokenizer
-from torch.utils.data import Dataset
 import pandas as pd
+from torch.utils.data import Dataset, DataLoader
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers.modeling_outputs import BaseModelOutput  # ✅ add this import
 from tqdm import tqdm
-from train_captioner import CLIP2DistilBART
+from train_captioner import CLIP2DistilBART  # reuse the model class
 import os
 
-# Dataset class for test set
 class Flickr8kEmbeddedTestDataset(Dataset):
-    def __init__(self, parquet_path, tokenizer, max_length=64):
+    def __init__(self, parquet_path: str):
         self.data = pd.read_parquet(parquet_path)
-        self.tokenizer = tokenizer
-        self.max_length = max_length
 
     def __len__(self):
         return len(self.data)
@@ -20,67 +18,68 @@ class Flickr8kEmbeddedTestDataset(Dataset):
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
         image_emb = torch.tensor(row["image_embeds"], dtype=torch.float32)
-        caption = row["caption"]
-        return {
-            "image_emb": image_emb,
-            "caption": caption
-        }
+        image_id = row.get("image_id", idx)
+        return {"image_emb": image_emb, "image_id": image_id}
+
+def inference_collate_fn(batch):
+    image_embs = torch.stack([b["image_emb"] for b in batch])
+    image_ids = [b.get("image_id") for b in batch]
+    return {"image_emb": image_embs, "image_id": image_ids}
 
 @torch.no_grad()
-def generate_captions(model, dataset, tokenizer, device, batch_size=32):
+def generate_captions(model, tokenizer, dataloader, device, output_path="generated_captions.csv"):
     model.eval()
-    model.to(device)
+    results = []
+    for batch in tqdm(dataloader, desc="Generating captions"):
+        image_embs = batch["image_emb"].to(device)
 
-    predictions = []
-    references = []
+        # Project CLIP embeddings into BART hidden space and add seq dim
+        encoder_hidden = model.projection(image_embs).unsqueeze(1)  # [B, 1, d_model]
 
-    for i in tqdm(range(0, len(dataset), batch_size)):
-        batch = [dataset[j] for j in range(i, min(i + batch_size, len(dataset)))]
-        image_embs = torch.stack([item['image_emb'] for item in batch]).to(device)
-        ground_truths = [item['caption'] for item in batch]
+        # ✅ wrap it properly for BART.generate()
+        encoder_outputs = BaseModelOutput(last_hidden_state=encoder_hidden)
 
-        encoder_hidden = model.projection(image_embs).unsqueeze(1)
         generated_ids = model.bart.generate(
-            inputs_embeds=encoder_hidden,
+            encoder_outputs=encoder_outputs,
+            decoder_start_token_id=tokenizer.bos_token_id,  # ✅ required for encoder-decoder models
             max_length=64,
             num_beams=5,
-            early_stopping=True
+            early_stopping=True,
+            do_sample=False,
+            length_penalty=1.0,  # ✅ avoids NoneType error
         )
 
-        decoded_preds = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-        predictions.extend(decoded_preds)
-        references.extend(ground_truths)
 
-    return predictions, references
+        captions = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+        image_ids = batch["image_id"]
 
-def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
+        for img_id, caption in zip(image_ids, captions):
+            results.append({"image_id": img_id, "caption": caption})
 
-    model_name = "sshleifer/distilbart-cnn-12-6"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    df = pd.DataFrame(results)
+    df.to_csv(output_path, index=False)
+    print(f"\n✅ Captions saved to {output_path}")
+    return df
 
-    print("Loading test dataset...")
-    test_dataset = Flickr8kEmbeddedTestDataset(
-        "embedded_data/flickr8k_test_embedded.parquet", tokenizer
-    )
+# -------------------------
+# Main block
+# -------------------------
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model_dir = "caption_model_final"  # ensure no './' prefix
+test_path = "embedded_data/flickr8k_test_embedded.parquet"
 
-    print("Loading trained model...")
-    model = CLIP2DistilBART()
-    model.bart.from_pretrained("caption_model_final")
-    model.projection.load_state_dict(torch.load("caption_model_final/projection.pt"))
+print("Loading tokenizer and trained model...")
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
 
-    print("Generating captions...")
-    predictions, references = generate_captions(model, test_dataset, tokenizer, device)
+model = CLIP2DistilBART()
+model.bart = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.projection.load_state_dict(torch.load(os.path.join(model_dir, "projection.pt"), map_location=device))
+model.to(device)
 
-    # Save to CSV
-    output_df = pd.DataFrame({
-        "prediction": predictions,
-        "reference": references
-    })
-    output_path = "generated_captions.csv"
-    output_df.to_csv(output_path, index=False)
-    print(f"\nSaved generated captions to {output_path}")
+print("Preparing test data...")
+test_ds = Flickr8kEmbeddedTestDataset(test_path)
+test_dl = DataLoader(test_ds, batch_size=16, shuffle=False, collate_fn=inference_collate_fn)
 
-if __name__ == "__main__":
-    main()
+print("Generating captions...")
+df = generate_captions(model, tokenizer, test_dl, device)
+df.head()

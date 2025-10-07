@@ -1,36 +1,35 @@
-# evaluate_captions.py
-from pycocoevalcap.bleu.bleu import Bleu
-from pycocoevalcap.cider.cider import Cider
 import pandas as pd
+import evaluate
 
-def evaluate_metrics(predictions, references):
-    # Prepare for BLEU
-    gts = {str(i): [references[i]] for i in range(len(references))}
-    res = {str(i): [predictions[i]] for i in range(len(predictions))}
+# Load generated captions
+gen_df = pd.read_csv("generated_captions.csv")  # columns: image_id, caption
 
-    bleu_scorer = Bleu()
-    bleu_score, _ = bleu_scorer.compute_score(gts, res)
-    
-    # Print all BLEU scores (BLEU-1, BLEU-2, BLEU-3, BLEU-4)
-    print(f"\nBLEU-1 score: {bleu_score[0]:.4f}")
-    print(f"BLEU-2 score: {bleu_score[1]:.4f}")
-    print(f"BLEU-3 score: {bleu_score[2]:.4f}")
-    print(f"BLEU-4 score: {bleu_score[3]:.4f}")
+# Load ground-truth captions
+gt_df = pd.read_parquet("embedded_data/flickr8k_test_embedded.parquet")  # columns: caption, ...
 
-    # Prepare for CIDEr
-    cider_scorer = Cider()
-    cider_score, _ = cider_scorer.compute_score(gts, res)
-    print(f"CIDEr score: {cider_score:.4f}")
+# Ensure lengths match
+assert len(gen_df) == len(gt_df), "❌ Length mismatch between predictions and ground truth!"
 
-def main():
-    # Load from CSV
-    df = pd.read_csv("generated_captions.csv")
+# Prepare predictions and references
+predictions = gen_df["caption"].astype(str).tolist()
+final_predictions = []
+for i in range(len(predictions)):
+  if i % 5 == 0:
+    final_predictions.append(predictions[i])
+references  = gt_df["caption"].astype(str).tolist()  # single reference per prediction
+final_references = []
+temp = []
+for i in range(len(references)):
+  temp.append(references[i])
+  if len(temp) == 5:
+    final_references.append(temp)
+    temp = []
 
-    predictions = df["prediction"].tolist()
-    references = df["reference"].tolist()
+# Load BLEU metric
+bleu = evaluate.load("bleu")
+cider = evaluate.load("sunhill/cider")
+bleu_score = bleu.compute(predictions=final_predictions, references=final_references)
+cider_score = cider.compute(predictions=final_predictions, references=final_references)
 
-    print("Evaluating BLEU and CIDEr metrics...")
-    evaluate_metrics(predictions, references)
-
-if __name__ == "__main__":
-    main()
+print(f"✅ Average BLEU score: {bleu_score['bleu']:.4f}")
+print(f"✅ Average CIDEr score: {cider_score['cider_score']:.4f}")
