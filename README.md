@@ -64,6 +64,12 @@ We load the embedded dataset and create a projection layer between the embedded 
 
 Then we train the model and save it at the end.
 
+## Model Evaluation
+
+Run the file `python generate_captions.py` to use the model to generate image captions from the test dataset. The captions are saved to generated_captions.csv.
+
+Run the file `python evaluate_captions.py` to compare the generated captions with the test dataset captions using BLEU and CIDEr metrics.
+
 ## Extras
 
 ### check_scripts folder
