@@ -10,3 +10,6 @@ data/
 
 # Output Embeddings and Metadata (only if it gets too big)
 embedded_data/
+
+# Model
+caption_model_final/
