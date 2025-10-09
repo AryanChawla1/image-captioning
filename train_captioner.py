@@ -1,4 +1,3 @@
-# train_captioner.py
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
@@ -11,9 +10,7 @@ from transformers import (
 )
 from typing import Dict
 
-# ===============================
-# 1. Dataset Class
-# ===============================
+# 1. Dataset class
 class Flickr8kEmbeddedDataset(Dataset):
    def __init__(self, parquet_path: str, tokenizer, max_length: int = 64):
       self.data = pd.read_parquet(parquet_path)
@@ -43,9 +40,7 @@ class Flickr8kEmbeddedDataset(Dataset):
          "labels": tokenized["input_ids"].squeeze(),
       }
 
-# ===============================
-# 2. Model Definition
-# ===============================
+# 2. Model definition
 class CLIP2DistilBART(nn.Module):
    def __init__(self, clip_emb_dim=512, bart_model_name="sshleifer/distilbart-cnn-12-6"):
       super().__init__()
@@ -61,9 +56,7 @@ class CLIP2DistilBART(nn.Module):
       )
       return outputs
 
-# ===============================
-# 3. Collate Function
-# ===============================
+# 3. Collate function
 def collate_fn(batch):
    image_embs = torch.stack([b["image_emb"] for b in batch])
    labels = torch.stack([b["labels"] for b in batch])
@@ -72,9 +65,7 @@ def collate_fn(batch):
       "labels": labels,
    }
 
-# ===============================
-# 4. Training Entry Point
-# ===============================
+# 4. Training entry point
 def main():
    model_name = "sshleifer/distilbart-cnn-12-6"
    tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -102,7 +93,6 @@ def main():
       fp16=torch.cuda.is_available(),
       report_to=[],
    )
-
 
    trainer = Trainer(
       model=model,

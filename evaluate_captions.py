@@ -1,35 +1,31 @@
 import pandas as pd
-import evaluate
+from pycocoevalcap.bleu.bleu import Bleu
+from pycocoevalcap.cider.cider import Cider
 
 # Load generated captions
-gen_df = pd.read_csv("generated_captions.csv")  # columns: image_id, caption
+gen_df = pd.read_csv("generated_captions.csv")
 
 # Load ground-truth captions
-gt_df = pd.read_parquet("embedded_data/flickr8k_test_embedded.parquet")  # columns: caption, ...
+gt_df = pd.read_parquet("embedded_data/flickr8k_test_embedded.parquet")
 
-# Ensure lengths match
-assert len(gen_df) == len(gt_df), "❌ Length mismatch between predictions and ground truth!"
+# Prepare predictions dict: {image_id: generated_caption}
+predictions = {}
+for i, row in gen_df.iterrows():
+    predictions[i] = [str(row["caption"])]
 
-# Prepare predictions and references
-predictions = gen_df["caption"].astype(str).tolist()
-final_predictions = []
-for i in range(len(predictions)):
-  if i % 5 == 0:
-    final_predictions.append(predictions[i])
-references  = gt_df["caption"].astype(str).tolist()  # single reference per prediction
-final_references = []
-temp = []
-for i in range(len(references)):
-  temp.append(references[i])
-  if len(temp) == 5:
-    final_references.append(temp)
-    temp = []
+# Prepare references dict: {image_id: [ref1, ref2, ...]}
+references = {}
+for i, row in gt_df.iterrows():
+    image_id = i // 5  # Group every 5 captions
+    references.setdefault(image_id, []).append(str(row["caption"]))
 
-# Load BLEU metric
-bleu = evaluate.load("bleu")
-cider = evaluate.load("sunhill/cider")
-bleu_score = bleu.compute(predictions=final_predictions, references=final_references)
-cider_score = cider.compute(predictions=final_predictions, references=final_references)
+# Initialize scorers
+bleu_scorer = Bleu(4)  # BLEU-1 to BLEU-4
+cider_scorer = Cider()
 
-print(f"✅ Average BLEU score: {bleu_score['bleu']:.4f}")
-print(f"✅ Average CIDEr score: {cider_score['cider_score']:.4f}")
+# Compute scores
+bleu_scores, _ = bleu_scorer.compute_score(references, predictions)
+cider_score, _ = cider_scorer.compute_score(references, predictions)
+
+print(f"BLEU-4 score: {bleu_scores[3]:.4f}")
+print(f"CIDEr score: {cider_score:.4f}")
