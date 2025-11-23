@@ -7,10 +7,10 @@ from tqdm import tqdm
 import os
 
 # 1. Test dataset class
-class Flickr8kEmbeddedTestDataset(Dataset):
+class COCOEmbeddedTestDataset(Dataset):
     def __init__(self, parquet_path: str):
         df = pd.read_parquet(parquet_path)
-        self.data = df.drop_duplicates(subset="image")  # Drop duplicate rows
+        self.data = df.drop_duplicates(subset="imgid")  # Drop duplicate rows
 
     def __len__(self):
         return len(self.data)
@@ -18,7 +18,7 @@ class Flickr8kEmbeddedTestDataset(Dataset):
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
         image_emb = torch.tensor(row["image_embeds"], dtype=torch.float32)
-        image_id = row.get("image_id", idx)
+        image_id = row.get("imgid", idx)
         return {"image_emb": image_emb, "image_id": image_id}
 
 # 2. Inference collate function
@@ -70,7 +70,7 @@ def generate_captions(model, tokenizer, dataloader, device, output_path="generat
 # 4. Main block
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model_dir = "caption_model_final"
-test_path = "embedded_data/flickr8k_test_embedded.parquet"
+test_path = "embedded_data/coco_test_embedded.parquet"
 
 print("Loading tokenizer and trained model...")
 tokenizer = AutoTokenizer.from_pretrained(model_dir)
@@ -81,7 +81,7 @@ model.projection.load_state_dict(torch.load(os.path.join(model_dir, "projection.
 model.to(device)
 
 print("Preparing test data...")
-test_ds = Flickr8kEmbeddedTestDataset(test_path)
+test_ds = COCOEmbeddedTestDataset(test_path)
 test_dl = DataLoader(test_ds, batch_size=16, shuffle=False, collate_fn=inference_collate_fn)
 
 print("Generating captions...")

@@ -1,8 +1,8 @@
 # Image Captioning Project: Flickr8k Data
 
-This project uses the Flickr8k dataset and the Hugging Face `datasets` library to prepare data for training an image captioning model.
+This project uses the COCO dataset and the Hugging Face `datasets` library to prepare data for training an image captioning model.
 
-The `prepare_data.py` script downloads the dataset, flattens the five captions per image into single image-caption pairs, and saves them into three optimized Parquet files.
+The `prepare_data.py` script downloads the dataset annotations, flattens the five captions per image into single image-caption pairs, and saves them into three optimized Parquet files.
 
 ## Setup and Installation
 
@@ -32,27 +32,37 @@ To update the dependencies list after installing new libraries:
 
 ### 3. Run Data Preparation
 
-Once dependencies are installed, run the data preparation script.
+Once dependencies are installed, download the dataset.
+
+```
+!wget http://images.cocodataset.org/zips/train2014.zip
+!wget http://images.cocodataset.org/zips/val2014.zip
+
+!unzip train2014.zip -d coco
+!unzip val2014.zip -d coco
+```
+
+Then run the data preparation script.
 
 `python prepare_data.py`
 
 This command will:
 
-1. Download the `jxie/flickr8k` dataset (if not already cached).
+1. Download the `yerevann/coco-karpathy` dataset (if not already cached).
 
 2. Process the `train`, `validation`, and `test` splits.
 
 3. Create a directory named `data/`.
 
-4. Save the three finalized, flattened dataset files as `flickr8k_train.parquet`, `flickr8k_validation.parquet`, and `flickr8k_test.parquet` inside the `processed_data/` directory.
+4. Save the three finalized, flattened dataset files as `coco_train.parquet`, `coco_validation.parquet`, and `coco_test.parquet` inside the `processed_data/` directory.
 
 ### 4. Generate embeddings
 
 After the Parquet files are created, run `python generate_embeddings.py` file to create embeddings.
 
-It should result in three new files: `flickr8k_train_embedded.parquet`, `flickr8k_validation_embedded.parquet`, and `flickr8k_test_embedded.parquet`.
+It should result in three new files: `coco_train_embedded.parquet`, `coco_validation_embedded.parquet`, and `coco_test_embedded.parquet`.
 
-These files contain 4 columns: original image, original caption, image embeddings, caption embeddings.
+These files contain 6 columns: original image id, original coco id, original image path, original caption, image embeddings, caption embeddings.
 
 These embeddings WILL be added in the .gitignore files.
 

@@ -11,7 +11,7 @@ from transformers import (
 from typing import Dict
 
 # 1. Dataset class
-class Flickr8kEmbeddedDataset(Dataset):
+class COCOEmbeddedDataset(Dataset):
    def __init__(self, parquet_path: str, tokenizer, max_length: int = 64):
       self.data = pd.read_parquet(parquet_path)
       self.tokenizer = tokenizer
@@ -46,7 +46,7 @@ class CLIP2DistilBART(nn.Module):
       super().__init__()
       self.bart = AutoModelForSeq2SeqLM.from_pretrained(bart_model_name)
       self.projection = nn.Linear(clip_emb_dim, self.bart.config.d_model)
-   
+
    def forward(self, image_emb, labels=None):
       # Map 512-dim CLIP vector to DistilBART encoder hidden size (e.g., 768)
       encoder_hidden = self.projection(image_emb).unsqueeze(1)  # [batch, 1, hidden_dim]
@@ -70,9 +70,9 @@ def main():
    model_name = "sshleifer/distilbart-cnn-12-6"
    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-   print("Loading embedded Flickr8k data...")
-   train_ds = Flickr8kEmbeddedDataset("embedded_data/flickr8k_train_embedded.parquet", tokenizer)
-   val_ds = Flickr8kEmbeddedDataset("embedded_data/flickr8k_validation_embedded.parquet", tokenizer)
+   print("Loading embedded COCO data...")
+   train_ds = COCOEmbeddedDataset("embedded_data/coco_train_embedded.parquet", tokenizer)
+   val_ds = COCOEmbeddedDataset("embedded_data/coco_validation_embedded.parquet", tokenizer)
 
    print("Initializing CLIP2DistilBART model...")
    model = CLIP2DistilBART(clip_emb_dim=512, bart_model_name=model_name)
@@ -106,10 +106,10 @@ def main():
    trainer.train()
 
    print("Saving model...")
-   model.bart.save_pretrained("./caption_model_final", safe_serialization=False)
-   tokenizer.save_pretrained("./caption_model_final")
-   torch.save(model.projection.state_dict(), "./caption_model_final/projection.pt")
-   print("Training complete. Model saved to ./caption_model_final")
+   model.bart.save_pretrained("caption_model_final", safe_serialization=False)
+   tokenizer.save_pretrained("caption_model_final")
+   torch.save(model.projection.state_dict(), "caption_model_final/projection.pt")
+   print("Training complete. Model saved to caption_model_final")
 
 if __name__ == "__main__":
    main()

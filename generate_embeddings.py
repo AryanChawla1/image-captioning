@@ -32,33 +32,35 @@ except Exception as e:
 # 3. Load dataset
 print(f"Loading processed Parquet files from /data")
 dataset = DatasetDict({
-    "train": Dataset.from_parquet("data/flickr8k_train.parquet"),
-    "validation": Dataset.from_parquet("data/flickr8k_validation.parquet"),
-    "test": Dataset.from_parquet("data/flickr8k_test.parquet")
+    "train": Dataset.from_parquet("data/coco_train.parquet"),
+    "validation": Dataset.from_parquet("data/coco_validation.parquet"),
+    "test": Dataset.from_parquet("data/coco_test.parquet")
 })
+
+print(dataset["train"].column_names)
 
 # 4. Embedding function
 @torch.no_grad()
 def generate_clip_embeddings(batch: Dict[str, List[Any]]) -> Dict[str, np.ndarray]:
     '''Process batch of images and captions and generate vector CLIP embeddings'''
-    
+
     # I. Process inputs using the CLIP processor
     # The processor handles image resizing/normalization and text tokenization
     inputs = processor(
-        text=batch["caption"], 
-        images=batch["image"], 
-        return_tensors="pt", 
+        text=batch["caption"],
+        images=[Image.open(path).convert("RGB") for path in batch["image_path"]],
+        return_tensors="pt",
         padding=True
     ).to(DEVICE)
-    
+
     # II. Run the model inference
     outputs = model(**inputs)
-    
+
     # III. Extract the pooled features (the final vector representations)
     # Convert tensors to numpy arrays for efficient storage in the dataset
     image_embeds = outputs.image_embeds.to("cpu").numpy()
     text_embeds = outputs.text_embeds.to("cpu").numpy()
-    
+
     # IV. Return results
     # The map function expects a dictionary of new columns
     return {
@@ -69,20 +71,21 @@ def generate_clip_embeddings(batch: Dict[str, List[Any]]) -> Dict[str, np.ndarra
 # 5. Generate embeddings and save results
 # Iterate over each split
 for split_name, ds in dataset.items():
-    output_filepath = os.path.join(OUTPUT_DIR, f"flickr8k_{split_name}_embedded.parquet")
+    output_filepath = os.path.join(OUTPUT_DIR, f"coco_{split_name}_embedded.parquet")
     print(f"\nGenerating CLIP embeddings for '{split_name}' split")
-    
+
     # Apply the embedding function
     embedded_ds = ds.map(
-        generate_clip_embeddings, 
+        generate_clip_embeddings,
         batched=True,
         batch_size=32, # Can be increased for faster processing
+        remove_columns=[]
     )
-    
+
     # Save the processed dataset to a new Parquet file
     # Original image/caption plus the two new embedding columns
     embedded_ds.to_parquet(output_filepath)
-    
+
     print(f"'{split_name}' embedded and saved successfully to '{output_filepath}'.")
 
 print("\nEmbedding Generation Complete")

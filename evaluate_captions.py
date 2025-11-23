@@ -6,18 +6,25 @@ from pycocoevalcap.cider.cider import Cider
 gen_df = pd.read_csv("generated_captions.csv")
 
 # Load ground-truth captions
-gt_df = pd.read_parquet("embedded_data/flickr8k_test_embedded.parquet")
+gt_df = pd.read_parquet("embedded_data/coco_test_embedded.parquet")
 
-# Prepare predictions dict: {image_id: generated_caption}
+# Prepare predictions dict
 predictions = {}
-for i, row in gen_df.iterrows():
-    predictions[i] = [str(row["caption"])]
+for _, row in gen_df.iterrows():
+    img_id = int(row["image_id"])
+    predictions[img_id] = [str(row["caption"])]
 
-# Prepare references dict: {image_id: [ref1, ref2, ...]}
+# Prepare references dict
 references = {}
-for i, row in gt_df.iterrows():
-    image_id = i // 5  # Group every 5 captions
-    references.setdefault(image_id, []).append(str(row["caption"]))
+for _, row in gt_df.iterrows():
+    img_id = int(row["imgid"])
+    caption = str(row["caption"])
+    references.setdefault(img_id, []).append(caption)
+
+# Filter to matching image IDs only
+common_ids = set(predictions.keys()) & set(references.keys())
+predictions = {k: predictions[k] for k in common_ids}
+references = {k: references[k] for k in common_ids}
 
 # Initialize scorers
 bleu_scorer = Bleu(4)  # BLEU-1 to BLEU-4
