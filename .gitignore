@@ -13,7 +13,7 @@ embedded_data/
 
 # Model
 caption_model_final/
-caption_model/
+# caption_model/
 old_caption_model/
 
 # COCO dataset
