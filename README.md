@@ -1,16 +1,14 @@
-# Image Captioning Project: Flickr8k Data
+# Image Captioning Project
 
-This project uses the COCO dataset and the Hugging Face `datasets` library to prepare data for training an image captioning model.
-
-The `prepare_data.py` script downloads the dataset annotations, flattens the five captions per image into single image-caption pairs, and saves them into three optimized Parquet files.
+This project was created to test the perfomance of a image captioning pipeline using CLIP embedding and a fine-tuned DistilBART transformer model. To test the performance, the COCO and Flickr8k datasets from HuggingFace were used.
 
 ## Setup and Installation
 
-This project uses a dedicated Python virtual environment (`venv`) named `venv_ic` to manage dependencies.
+This project uses a dedicated Python virtual environment (`venv`) named `venv_ic` to manage dependencies. To run the training and inference for this pipeline, please use the notebook files: `model_training.ipynb` and `inference.ipynb`.
 
 ### 1. Create and Activate Virtual Environment
 
-You must first create and activate the environment to isolate project dependencies. Try to use Python 3.12. If you have errors with installing PyTorch with cua129, change the cua version or remove it entirely to use the CPU instead.
+You must first create and activate the environment to isolate project dependencies. Try to use Python 3.12.
 
 | **Platform**             | **Command to Create**     | **Command to Activate**          |
 | :----------------------- | :------------------------ | :------------------------------- |
@@ -22,7 +20,7 @@ To deactivate the environment when finished: `deactivate`
 
 ### 2. Install Dependencies
 
-After activating the environment, install the required libraries (like `datasets` and `pandas`).
+After activating the environment, install the required libraries (like `datasets` and `pandas`). The first cell in `model_training.ipynb` covers this.
 
 `pip install -r requirements.txt`
 
@@ -30,9 +28,11 @@ To update the dependencies list after installing new libraries:
 
 `pip freeze > requirements.txt`
 
-### 3. Run Data Preparation
+It is highly reccomended to use a CUDA-compatible device for the training process. Alternatively, Google Colab can be used.
 
-Once dependencies are installed, download the dataset.
+### 3. Optional - Download COCO Dataset
+
+Download the COCO dataset if you would like to use it. The COCO dataset on HuggingFace doesn't attach the images, just the path to them. Because of this, the images have to be installed seperately.
 
 ```
 !wget http://images.cocodataset.org/zips/train2014.zip
@@ -42,50 +42,24 @@ Once dependencies are installed, download the dataset.
 !unzip val2014.zip -d coco
 ```
 
-Then run the data preparation script.
+## Training
 
-`python prepare_data.py`
+To train the model, run the cells in `model_training.ipynb`. If you completed the previous steps, you can start from the 4th cell. Select the appropriate `DATASET_NAME`.
 
-This command will:
+```
+# DATASET_NAME = "jxie/flickr8k" # flickr8k
+DATASET_NAME = "yerevann/coco-karpathy" # coco (make sure to download images beforehand)
+```
 
-1. Download the `yerevann/coco-karpathy` dataset (if not already cached).
+1. The 4th cell will save the captions to `captions.json`.
+2. The 5th cell embeds the images and save it to `patch_embed_float16.npy`.
+3. The 6th cell splits the images for training.
+4. The 7th cell loads the splits into a `Dataset` object.
+5. The 8th cell creates the adapter layer from the embedded image vector to DistilBART.
+6. The 9th cell trains the model and adapter layer weights. After training, the model is saved to `caption_model/`
+7. The 10th cell tests the model by generating captions. The metrics used to measure them are BLEU and CIDEr.
+8. The 11th cell shows the output using some test images.
 
-2. Process the `train`, `validation`, and `test` splits.
+## Inference
 
-3. Create a directory named `data/`.
-
-4. Save the three finalized, flattened dataset files as `coco_train.parquet`, `coco_validation.parquet`, and `coco_test.parquet` inside the `processed_data/` directory.
-
-### 4. Generate embeddings
-
-After the Parquet files are created, run `python generate_embeddings.py` file to create embeddings.
-
-It should result in three new files: `coco_train_embedded.parquet`, `coco_validation_embedded.parquet`, and `coco_test_embedded.parquet`.
-
-These files contain 6 columns: original image id, original coco id, original image path, original caption, image embeddings, caption embeddings.
-
-These embeddings WILL be added in the .gitignore files.
-
-## Tuning and stuff
-
-Run the file `python train_captioner.py` to train the model.
-
-We load the embedded dataset and create a projection layer between the embedded data and the model's input.
-
-Then we train the model and save it at the end.
-
-## Model Evaluation
-
-Run the file `python generate_captions.py` to use the model to generate image captions from the test dataset. The captions are saved to generated_captions.csv.
-
-Run the file `python evaluate_captions.py` to compare the generated captions with the test dataset captions using BLEU and CIDEr metrics.
-
-## Extras
-
-### check_scripts folder
-
-This folder contains short python scripts to check if things are working.
-
-`check_pytorch.py` checks if you can use GPU training over CPU
-
-`check_embeddings.py` prints the first few rows of embeddings from the generated Parquet files
+To use the model on images, use the `inference.ipynb` file. Make sure to have a trained model beforehand. Add the image paths to the second cell to generate the respective caption. This process involves loading the model, embedding the image, and then running it through the transformer to generate the caption. Depending on the complexity of the image, you can change the `max_length` to generate more tokens. However, we found 16 was appropriate.
